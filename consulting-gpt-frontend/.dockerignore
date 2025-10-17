@@ -1,0 +1,12 @@
+.git
+.gitignore
+.next
+.env
+.env.*
+node_modules
+npm-debug.log*
+README.md
+.husky
+.eslintrc.json
+.prettierrc.js
+.prettierignore

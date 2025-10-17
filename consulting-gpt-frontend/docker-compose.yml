@@ -1,0 +1,22 @@
+services:
+  frontend:
+    build:
+      context: .
+      target: development
+    container_name: consulting-gpt-frontend
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://host.docker.internal:8000/api/v1
+      - NEXT_PUBLIC_API_VERSION=v1
+    networks:
+      - consulting-gpt-network
+
+networks:
+  consulting-gpt-network:
+    name: consulting-gpt-network
+    driver: bridge
