@@ -1,0 +1,327 @@
+From ce4001c44d4d779a0a630025f3f95be03015bba5 Mon Sep 17 00:00:00 2001
+From: LMS <lms@lms-dev.com>
+Date: Wed, 1 Oct 2025 21:21:02 +0000
+Subject: [PATCH] Add CSV download functionality to ComparisonAxes,
+ RelatedPapers, and RelatedPatents sections
+
+---
+ .../components/ComparisonAxesSection.tsx      | 49 +++++++++++++---
+ .../RelatedPapersSectionModular.tsx           | 54 ++++++++++++++---
+ .../components/RelatedPatentsSection.tsx      | 54 ++++++++++++++---
+ consulting-gpt-frontend/lib/download.ts       | 58 +++++++++++++++++++
+ 4 files changed, 194 insertions(+), 21 deletions(-)
+ create mode 100644 consulting-gpt-frontend/lib/download.ts
+
+diff --git a/consulting-gpt-frontend/app/technology/components/ComparisonAxesSection.tsx b/consulting-gpt-frontend/app/technology/components/ComparisonAxesSection.tsx
+index c4849bf..b7f0d53 100644
+--- a/consulting-gpt-frontend/app/technology/components/ComparisonAxesSection.tsx
++++ b/consulting-gpt-frontend/app/technology/components/ComparisonAxesSection.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { Button } from '@/components/ui/button';
+ import {
+   Table,
+   TableBody,
+@@ -14,6 +15,7 @@ import { ScaleIcon } from '@heroicons/react/24/outline';
+ import { SectionSkeleton } from './SectionSkeleton';
+ import { AnalysisStatusResponse } from '@/actions/getAnalysisStatus';
+ import { ComparisonAxis } from '@/types/comparison-axis';
++import { downloadCsv } from '@/lib/download';
+ 
+ interface ComparisonAxesSectionProps {
+   analysisStatus: AnalysisStatusResponse | null;
+@@ -29,19 +31,52 @@ export function ComparisonAxesSection({
+   isLoaded,
+ }: ComparisonAxesSectionProps) {
+   const status = analysisStatus?.components?.comparisonAxes?.status || 'pending';
++  const hasAxes = comparisonAxes.length > 0;
++
++  const handleDownloadAxes = () => {
++    if (!hasAxes) {
++      return;
++    }
++
++    const rows = comparisonAxes.map((axis) => ({
++      'Axis Name': axis.axisName,
++      'Extreme 1': axis.extreme1,
++      'Extreme 2': axis.extreme2,
++      Weight: axis.weight,
++    }));
++
++    const fileSafeName = technologyName
++      ? technologyName.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase()
++      : 'technology';
++
++    downloadCsv(`comparison-axes-${fileSafeName}`, rows);
++  };
+ 
+   if (status === 'complete' && isLoaded) {
+     return (
+       <div id="comparison-axes">
+         <Card className="border-0 bg-white/90 py-0 shadow-lg backdrop-blur-sm">
+           <CardHeader className="rounded-t-lg bg-gradient-to-r from-green-500 to-teal-600 px-6 py-6 text-white">
+-            <CardTitle className="flex items-center gap-2 text-2xl font-semibold">
+-              <ScaleIcon className="h-5 w-5" />
+-              Comparison Axes
+-            </CardTitle>
+-            <CardDescription className="text-green-100">
+-              Detailed analysis of comparison axes
+-            </CardDescription>
++            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
++              <div>
++                <CardTitle className="flex items-center gap-2 text-2xl font-semibold">
++                  <ScaleIcon className="h-5 w-5" />
++                  Comparison Axes
++                </CardTitle>
++                <CardDescription className="text-green-100">
++                  Detailed analysis of comparison axes
++                </CardDescription>
++              </div>
++              <Button
++                size="sm"
++                variant="outline"
++                onClick={handleDownloadAxes}
++                disabled={!hasAxes}
++                className="border-white/50 text-white hover:bg-white/10 hover:text-white md:self-end"
++              >
++                Download CSV
++              </Button>
++            </div>
+           </CardHeader>
+           <CardContent className="p-6">
+             <Table>
+diff --git a/consulting-gpt-frontend/app/technology/components/RelatedPapersSectionModular.tsx b/consulting-gpt-frontend/app/technology/components/RelatedPapersSectionModular.tsx
+index d3eed34..45199ba 100644
+--- a/consulting-gpt-frontend/app/technology/components/RelatedPapersSectionModular.tsx
++++ b/consulting-gpt-frontend/app/technology/components/RelatedPapersSectionModular.tsx
+@@ -1,10 +1,12 @@
+ 'use client';
+ 
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { Button } from '@/components/ui/button';
+ import { Badge } from '@/components/ui/badge';
+ import { ExternalLinkIcon, FileTextIcon, AwardIcon } from 'lucide-react';
+ import { SectionSkeleton } from './SectionSkeleton';
+ import { AnalysisStatusResponse } from '@/actions/getAnalysisStatus';
++import { downloadCsv } from '@/lib/download';
+ 
+ interface Paper {
+   id: string;
+@@ -32,19 +34,57 @@ export function RelatedPapersSection({
+   formatDate,
+ }: RelatedPapersSectionProps) {
+   const status = analysisStatus?.components?.relatedPapers?.status || 'pending';
++  const hasPapers = papers.length > 0;
++
++  const handleDownloadPapers = () => {
++    if (!hasPapers) {
++      return;
++    }
++
++    const rows = papers.map((paper, index) => ({
++      '#': index + 1,
++      Title: paper.title || 'N/A',
++      'Publication Date': paper.publicationDate ? formatDate(paper.publicationDate) : 'N/A',
++      Authors: paper.authors || 'N/A',
++      Journal: paper.journal || 'N/A',
++      Citations: paper.citationCount ?? 'N/A',
++      Summary: paper.abstract || 'N/A',
++      'Paper Link': paper.url || 'N/A',
++    }));
++
++    const firstPaperId = papers[0]?.paperId;
++    const fileSuffix = firstPaperId
++      ? firstPaperId.replace(/[^a-z0-9_-]+/gi, '-')
++      : 'related-papers';
++
++    downloadCsv(`related-papers-${fileSuffix}`, rows);
++  };
+ 
+   if (status === 'complete' && isLoaded) {
+     return (
+       <div id="papers">
+         <Card className="border-0 bg-white/90 py-0 shadow-lg backdrop-blur-sm">
+           <CardHeader className="rounded-t-lg bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-4 text-white">
+-            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+-              <FileTextIcon className="h-5 w-5" />
+-              Related Papers
+-            </CardTitle>
+-            <CardDescription className="text-amber-100">
+-              Review relevant academic papers and research
+-            </CardDescription>
++            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
++              <div>
++                <CardTitle className="flex items-center gap-2 text-xl font-semibold">
++                  <FileTextIcon className="h-5 w-5" />
++                  Related Papers
++                </CardTitle>
++                <CardDescription className="text-amber-100">
++                  Review relevant academic papers and research
++                </CardDescription>
++              </div>
++              <Button
++                size="sm"
++                variant="outline"
++                onClick={handleDownloadPapers}
++                disabled={!hasPapers}
++                className="border-white/50 text-white hover:bg-white/10 hover:text-white md:self-end"
++              >
++                Download CSV
++              </Button>
++            </div>
+           </CardHeader>
+           <CardContent className="space-y-4 p-6">
+             {papers && papers.length > 0 ? (
+diff --git a/consulting-gpt-frontend/app/technology/components/RelatedPatentsSection.tsx b/consulting-gpt-frontend/app/technology/components/RelatedPatentsSection.tsx
+index 095998d..fb49d75 100644
+--- a/consulting-gpt-frontend/app/technology/components/RelatedPatentsSection.tsx
++++ b/consulting-gpt-frontend/app/technology/components/RelatedPatentsSection.tsx
+@@ -1,12 +1,14 @@
+ 'use client';
+ 
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { Button } from '@/components/ui/button';
+ import { Badge } from '@/components/ui/badge';
+ import { ExternalLinkIcon } from 'lucide-react';
+ import { DocumentMagnifyingGlassIcon } from '@heroicons/react/24/outline';
+ import { RelatedPatent } from '@/types/related-patent';
+ import { SectionSkeleton } from './SectionSkeleton';
+ import { AnalysisStatusResponse } from '@/actions/getAnalysisStatus';
++import { downloadCsv } from '@/lib/download';
+ 
+ interface RelatedPatentsSectionProps {
+   analysisStatus: AnalysisStatusResponse | null;
+@@ -22,19 +24,57 @@ export function RelatedPatentsSection({
+   formatDate,
+ }: RelatedPatentsSectionProps) {
+   const status = analysisStatus?.components?.relatedPatents?.status || 'pending';
++  const hasPatents = relatedPatents.length > 0;
++
++  const handleDownloadPatents = () => {
++    if (!hasPatents) {
++      return;
++    }
++
++    const rows = relatedPatents.map((doc, index) => ({
++      '#': index + 1,
++      Title: doc.name || 'N/A',
++      Type: doc.type || 'N/A',
++      'Document ID': doc.documentId || 'N/A',
++      'Publication Date': doc.publicationDate ? formatDate(doc.publicationDate) : 'N/A',
++      Inventors: Array.isArray(doc.inventors) ? doc.inventors.join(', ') : doc.inventors || 'N/A',
++      Assignees: Array.isArray(doc.assignees) ? doc.assignees.join(', ') : doc.assignees || 'N/A',
++      Summary: doc.abstract || 'N/A',
++      'Patent Link': doc.url || (doc.documentId ? `https://patents.google.com/${doc.documentId}` : 'N/A'),
++    }));
++
++    const fileSuffix = relatedPatents[0]?.technologyId
++      ? `tech-${relatedPatents[0].technologyId}`
++      : 'related-patents';
++
++    downloadCsv(`related-patents-${fileSuffix}`, rows);
++  };
+ 
+   if (status === 'complete' && isLoaded) {
+     return (
+       <div id="patents">
+         <Card className="border-0 bg-white/90 py-0 shadow-lg backdrop-blur-sm">
+           <CardHeader className="rounded-t-lg bg-gradient-to-r from-purple-500 to-pink-600 px-6 py-4 text-white">
+-            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+-              <DocumentMagnifyingGlassIcon className="h-5 w-5" />
+-              Related Patents
+-            </CardTitle>
+-            <CardDescription className="text-purple-100">
+-              Some related patents to your technology
+-            </CardDescription>
++            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
++              <div>
++                <CardTitle className="flex items-center gap-2 text-xl font-semibold">
++                  <DocumentMagnifyingGlassIcon className="h-5 w-5" />
++                  Related Patents
++                </CardTitle>
++                <CardDescription className="text-purple-100">
++                  Some related patents to your technology
++                </CardDescription>
++              </div>
++              <Button
++                size="sm"
++                variant="outline"
++                onClick={handleDownloadPatents}
++                disabled={!hasPatents}
++                className="border-white/50 text-white hover:bg-white/10 hover:text-white md:self-end"
++              >
++                Download CSV
++              </Button>
++            </div>
+           </CardHeader>
+           <CardContent className="space-y-4 p-6">
+             {relatedPatents && relatedPatents.length > 0 ? (
+diff --git a/consulting-gpt-frontend/lib/download.ts b/consulting-gpt-frontend/lib/download.ts
+new file mode 100644
+index 0000000..780160e
+--- /dev/null
++++ b/consulting-gpt-frontend/lib/download.ts
+@@ -0,0 +1,58 @@
++export type CsvValue = string | number | boolean | null | undefined;
++
++export type CsvRow = Record<string, CsvValue>;
++
++const normalizeValue = (value: CsvValue): string => {
++  if (value === null || value === undefined) {
++    return '';
++  }
++
++  const stringValue = String(value).replace(/\r?\n|\r/g, ' ').trim();
++  const needsQuoting = /[",\n]/.test(stringValue);
++
++  if (needsQuoting) {
++    return `"${stringValue.replace(/"/g, '""')}"`;
++  }
++
++  return stringValue;
++};
++
++const buildCsvContent = (rows: CsvRow[], headers?: string[]): string => {
++  if (!rows.length) {
++    return '';
++  }
++
++  const uniqueHeaders =
++    headers && headers.length
++      ? headers
++      : Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
++
++  const headerLine = uniqueHeaders.map((header) => normalizeValue(header)).join(',');
++  const dataLines = rows.map((row) =>
++    uniqueHeaders.map((header) => normalizeValue(row[header])).join(',')
++  );
++
++  return [headerLine, ...dataLines].join('\n');
++};
++
++export const downloadCsv = (filename: string, rows: CsvRow[], headers?: string[]) => {
++  if (!rows.length) {
++    return;
++  }
++
++  const csvContent = buildCsvContent(rows, headers);
++  if (!csvContent) {
++    return;
++  }
++
++  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' });
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++
++  link.href = url;
++  link.setAttribute('download', filename.endsWith('.csv') ? filename : `${filename}.csv`);
++  document.body.appendChild(link);
++  link.click();
++  document.body.removeChild(link);
++  URL.revokeObjectURL(url);
++};
+-- 
+2.50.1
+
