@@ -19,6 +19,9 @@ async def lifespan(app: FastAPI):
     
     # Shutdown: Clean up resources if needed
     pass
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 app = FastAPI(
     title="Consulting GPT API",
