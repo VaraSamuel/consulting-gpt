@@ -15,6 +15,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 curl \
  && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 curl build-essential \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
 COPY requirements.txt .
